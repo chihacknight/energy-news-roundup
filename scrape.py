@@ -1,3 +1,4 @@
+from cgitb import strong
 from bs4 import BeautifulSoup  #Importing the Beautiful Soup Library
 import requests				   #Importing the requests library
 import time					   #Importing the time library
@@ -7,16 +8,19 @@ import pandas as pd
 from zmq import curve_public					   #Importing the csv module
 
 def bulletPointScrape(arr, link, date, category):
-    print(arr)
     curItem = {}
     blurbText = ''
     links = []
 
+    #adding all the children text, except the last since the last element should be the publication
     for childPos in range(len(arr)-1):
         blurbText += arr[childPos].text
+
+        #if the child is an a tag, get the link
         if arr[childPos].name == 'a':
             links.append(arr[childPos].get('href'))
     
+    #remove the first character since that should be the bullet point
     blurbText = blurbText[1:]
 
     curItem['category'] = category
@@ -33,11 +37,9 @@ digestItems = []
 
 #digestLink is the link to an article
 def getDigestItems(digestLink):
-    print(digestLink)
 
     response = requests.get(digestLink)
     soup = BeautifulSoup(response.text, 'lxml')
-    curDigestLink = digestLink
 
     date = ''
 
@@ -60,81 +62,36 @@ def getDigestItems(digestLink):
 
             #run though each category by finding the strong tags
             strongTags = p.find_all('strong')
-            # for i in range(len(strongTags)-1,0,-1):
-            #     if str(type(strongTags[i])) == "<class 'bs4.element.Tag'>":
-            #                 if list(strongTags[i].children)[-1].name == 'br':
-            #                     print('del cause thing while')
-            #                     del strongTags[i]
-
             strongTags.extend(p.find_all('b'))
 
-            #the fitst string tag should be the category name
+            #the first strong tag should be the category name
             if len(strongTags) < 1:
                 continue
             curCategory = strongTags[0].text[:-1]
             
-            #if there is more than the one strong tag, this means there are bullet points
-            if len(strongTags) > 1:
-                addingString = ''
-
-                #run through each of the bullet points, skip the first one because the first on is the category name
-                # for curStringIndex in range(1,len(strongTags)):
-                #     curItem = {}
-                #     curString = []
-                #     links = []
-                #     publication = 'Unknown'
-
-                #     addingString = strongTags[curStringIndex].next_sibling
-
-                #     #until there is a new line or no more elements, keep adding the next element in the tree
-
-
-                #     while addingString is not None and addingString.name != 'br' and addingString.name != 'b':
-                #         if str(type(addingString)) == "<class 'bs4.element.Tag'>":
-                #             if list(addingString.children)[-1].name == 'br':
-                #                 print('broke out cause thing while')
-                #                 break
-
-                #         curString.append(addingString)
-                #         addingString = addingString.next_sibling
-
-                #     blurbText = ''
-
-                #     #for each element, if it is an a tag, get the link and text, if it is a em tag, that means it is the publication, and if it is neither, it is just text
-                #     for tag in curString:
-                #         if tag.name == 'a':
-                #             links.append(tag.get('href'))
-                #             blurbText += tag.text
-                #         elif tag.name == 'em' or tag.name == 'i':
-                #             publication = tag.text.strip()[1:-1]
-                #         else:
-                #             blurbText += tag.text
-
-                #     curItem['category'] = curCategory
-                #     curItem['date'] = date
-                #     curItem['publication'] = publication
-                #     curItem['blurb'] = blurbText
-                #     curItem['links-within-blurb'] = links
-                #     curItem['article-link'] = digestLink
-
-                #     digestItems.append(curItem)
+            if '•' in p.text:
 
                 currentString = []
                 gettingDataActive = False
 
                 for child in p:
-                    print(child.text)
+
+                    #checks if the first character is a bullet point, if so starts collecting child tags 
                     if not gettingDataActive and len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
                         gettingDataActive = True
                         currentString.append(child)
-                    elif len(child.text.strip()) > 0 and child.text.strip()[0] == '(':
+                    #if the first or last character is open/close paranthses, stop collecting
+                    elif (len(child.text.strip()) > 0 and child.text.strip()[0] == '(') or (len(child.text.strip()) > 0 and child.text.strip()[-1] == ')'):
                         currentString.append(child)
                         gettingDataActive = False
                         bulletPointScrape(currentString, link=digestLink, date=date, category = curCategory)
                         currentString = []
+                    #if the first is bullet point, stop collecting
                     elif len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
                         gettingDataActive = False
                         bulletPointScrape(currentString, link=digestLink, date=date, category = curCategory)
+                        currentString = []
+                    #if neither stop condition met and actively collecting data, add to active
                     elif gettingDataActive:
                         currentString.append(child)
 
@@ -144,8 +101,10 @@ def getDigestItems(digestLink):
                 curItem['category'] = curCategory
                 curItem['date'] = date
 
+                #default to unknown for publication
                 publication = 'Unknown'
 
+                #because of inconsistencies, the oublication can either be in an em or in an i tag, so check both
                 if p.find('em') is not None:
                     publication = p.find('em').text.strip()[1:-1]
                 elif p.find('i') is not None:
@@ -155,8 +114,10 @@ def getDigestItems(digestLink):
 
 
                 blurbText = ''
+
+                #add all text to blurb except category and publication
                 for element in p:
-                    if element.name != 'strong' and element.name != 'em' and element.name != 'i':
+                    if element.name != 'strong' and element.name != 'em' and element.name != 'i' and element.name != 'b':
                         blurbText += element.text
 
                 curItem['blurb'] = blurbText
@@ -178,7 +139,7 @@ digestLinks = []
 
 i = 1
 # Note, keep number low for testing
-while i < 2:
+while i < 51:
     response = requests.get(baseUrl.format(i))
     soup = BeautifulSoup(response.text, 'lxml')
     articles = soup.find_all('article')
