@@ -67,7 +67,7 @@ def getDigestItems(digestLink):
             #the first strong tag should be the category name
             if len(strongTags) < 1:
                 continue
-            curCategory = strongTags[0].text[:-1]
+            curCategory = strongTags[0].text.strip()[:-1]
             
             if '•' in p.text:
 
