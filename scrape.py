@@ -1,14 +1,10 @@
-from cgitb import strong
-from functools import cache
-from typing import final
+from attr import field
 from bs4 import BeautifulSoup  #Importing the Beautiful Soup Library
 import requests				   #Importing the requests library
-import time					   #Importing the time library
 import pandas as pd
 import json
 import requests_cache
-
-from zmq import curve_public
+import csv
 
 #for the older variant, if find 404 page, then stop
 def isFinalPageOld(link):
@@ -77,7 +73,6 @@ def getDigestItems(digestLink):
 
         for p in paragraphLinks:
             curItem = {}
-            # print(p.find('strong'))
 
             #run though each category by finding the strong tags
             strongTags = p.find_all('strong')
@@ -128,12 +123,9 @@ def getDigestItems(digestLink):
                     publication = p.find('em').text.strip()[1:-1]
                 elif p.find('i') is not None:
                     publication = p.find('i').text.strip()[1:-1]
-
                 curItem['publication'] = publication
 
-
                 blurbText = ''
-
                 #add all text to blurb except category and publication
                 for element in p:
                     if element.name != 'strong' and element.name != 'em' and element.name != 'i' and element.name != 'b':
@@ -150,7 +142,7 @@ def getDigestItems(digestLink):
 
                 digestItems.append(curItem)
 
-        #TODO should get Category, date, publication, blurb, link to the page, plus all links within the blurb, city, state
+        #TODO should get state
 
 
 requests_cache.install_cache('getting-article-cache', backend='sqlite')
@@ -169,9 +161,9 @@ newPostCounter = 1
 
 #run until stop condition of no links
 while True:
+    print('new pages getting page', newPostCounter)
     response = requests.get(curentPosts.format(NUM_POSTS_PER_PAGE_NEW, newPostCounter))
     parsedText = json.loads(response.text)
-    # soup = BeautifulSoup(parsedText, 'lxml')
     if isFinalPageNew(parsedText):
         break
 
@@ -190,6 +182,7 @@ for metaEl in newArticles:
 
 #run until stop condition of finding 404 page
 while True:
+    print('old pages getting page', oldPostCounter)
     if isFinalPageOld(march2022Posts.format(oldPostCounter)):
         break
     response = requests.get(march2022Posts.format(oldPostCounter))
@@ -213,7 +206,12 @@ for aElement in oldArticles:
 for link in digestLinks:
     getDigestItems(link)
 
-# TODO store in a structured way.
+#write to csv
+with open('digestItems.csv', 'w') as csvfile:
+    fieldNames = ['category', 'date', 'publication', 'blurb', 'links-within-blurb', 'article-link']
+    writer = csv.DictWriter(csvfile, fieldnames=fieldNames)
 
-df = pd.DataFrame.from_dict(digestItems)
-df.to_excel('digestItems.xlsx')
+    writer.writeheader()
+
+    for row in digestItems:
+        writer.writerow(row)
