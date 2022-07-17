@@ -1,7 +1,6 @@
 from attr import field
 from bs4 import BeautifulSoup  #Importing the Beautiful Soup Library
 import requests				   #Importing the requests library
-import pandas as pd
 import json
 import requests_cache
 import csv
@@ -14,7 +13,7 @@ def isFinalPageOld(link):
 
     return False
 
-#fpr the newer variant, if find an empty array, then stop
+#for the newer variant, if find an empty array, then stop
 def isFinalPageNew(jsonFile):
     if len(jsonFile['items']) < 1:
         return True
@@ -26,6 +25,9 @@ def bulletPointScrape(arr, link, date, category):
     blurbText = ''
     links = []
 
+    if len(arr) < 1:
+        return
+
     #adding all the children text, except the last since the last element should be the publication
     for childPos in range(len(arr)-1):
         blurbText += arr[childPos].text
@@ -35,7 +37,8 @@ def bulletPointScrape(arr, link, date, category):
             links.append(arr[childPos].get('href'))
     
     #remove the first character since that should be the bullet point
-    blurbText = blurbText[1:]
+    if len(blurbText) > 0 and blurbText[0] == '•':
+        blurbText = blurbText[1:]
 
     curItem['category'] = category
     curItem['date'] = date
@@ -59,8 +62,11 @@ def getDigestItems(digestLink):
     date = ''
 
     datePosted = soup.find(class_='posted-on')
-    dateTag = list(datePosted.children)[0]
-    date = dateTag.text
+    if datePosted:
+        dateTag = list(datePosted.children)[0]
+        date = dateTag.text
+    else: 
+        date = 'Unknown'
 
     #all of the content we want within each article (aka the paragraphs of information)
     entryContentEls = soup.find_all(class_='entry-content')
@@ -79,9 +85,13 @@ def getDigestItems(digestLink):
             strongTags.extend(p.find_all('b'))
 
             #the first strong tag should be the category name
-            if len(strongTags) < 1:
+            if len(strongTags) < 1 or strongTags[0] == '':
                 continue
+
             curCategory = strongTags[0].text.strip()[:-1]
+
+            if 'sponsored' in curCategory.lower() or 'ad' in curCategory.lower() or 'message' in curCategory.lower():
+                continue
             
             if '•' in p.text:
 
@@ -98,6 +108,10 @@ def getDigestItems(digestLink):
                     elif (len(child.text.strip()) > 0 and child.text.strip()[0] == '(') or (len(child.text.strip()) > 0 and child.text.strip()[-1] == ')'):
                         currentString.append(child)
                         gettingDataActive = False
+                        bulletPointScrape(currentString, link=digestLink, date=date, category = curCategory)
+                        currentString = []
+                    #if last is bullet point, stop collecting then start collecting for next one
+                    elif len(child.text.strip()) > 0 and child.text.strip()[-1] == '•':
                         bulletPointScrape(currentString, link=digestLink, date=date, category = curCategory)
                         currentString = []
                     #if the first is bullet point, stop collecting
