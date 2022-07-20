@@ -92,7 +92,7 @@ def getDigestItems(digestLink):
 
             if 'sponsored' in curCategory.lower() or 'ad' in curCategory.lower() or 'message' in curCategory.lower():
                 continue
-            
+
             if '•' in p.text:
 
                 currentString = []
@@ -104,14 +104,14 @@ def getDigestItems(digestLink):
                     if not gettingDataActive and len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
                         gettingDataActive = True
                         currentString.append(child)
+                    #if last is bullet point, stop collecting then start collecting for next one
+                    elif len(child.text.strip()) > 0 and child.text.strip()[-1] == '•':
+                        bulletPointScrape(currentString, link=digestLink, date=date, category = curCategory)
+                        currentString = []
                     #if the first or last character is open/close paranthses, stop collecting
                     elif (len(child.text.strip()) > 0 and child.text.strip()[0] == '(') or (len(child.text.strip()) > 0 and child.text.strip()[-1] == ')'):
                         currentString.append(child)
                         gettingDataActive = False
-                        bulletPointScrape(currentString, link=digestLink, date=date, category = curCategory)
-                        currentString = []
-                    #if last is bullet point, stop collecting then start collecting for next one
-                    elif len(child.text.strip()) > 0 and child.text.strip()[-1] == '•':
                         bulletPointScrape(currentString, link=digestLink, date=date, category = curCategory)
                         currentString = []
                     #if the first is bullet point, stop collecting
