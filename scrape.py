@@ -47,8 +47,8 @@ def bulletPointScrape(arr, link, date, category):
     curItem['blurb'] = blurbText
     curItem['links-within-blurb'] = links
     curItem['article-link'] = link
-
-    print(getStates(curItem))
+    curItem['states'] = getStates(curItem).regions
+    curItem['cities'] = getStates(curItem).cities
 
     digestItems.append(curItem)
 
@@ -58,7 +58,7 @@ def getStates(item):
 
     entities = locationtagger.find_locations(text = text)
 
-    return entities.regions
+    return entities
 
 digestItems = []
 
@@ -163,8 +163,8 @@ def getDigestItems(digestLink):
 
                 curItem['links-within-blurb'] = links
                 curItem['article-link'] = digestLink
-
-                print(getStates(curItem))
+                curItem['states'] = getStates(curItem).regions
+                curItem['cities'] = getStates(curItem).cities
 
                 digestItems.append(curItem)
 
@@ -191,9 +191,6 @@ while True:
     response = requests.get(curentPosts.format(NUM_POSTS_PER_PAGE_NEW, newPostCounter))
     parsedText = json.loads(response.text)
 
-    if newPostCounter >=5:
-        break;
-
     if isFinalPageNew(parsedText):
         break
 
@@ -213,9 +210,6 @@ for metaEl in newArticles:
 #run until stop condition of finding 404 page
 while True:
     print('old pages getting page', oldPostCounter)
-
-    if oldPostCounter >= 5:
-        break
 
     if isFinalPageOld(march2022Posts.format(oldPostCounter)):
         break
@@ -242,7 +236,7 @@ for link in digestLinks:
 
 #write to csv
 with open('digestItems.csv', 'w') as csvfile:
-    fieldNames = ['category', 'date', 'publication', 'blurb', 'links-within-blurb', 'article-link']
+    fieldNames = ['category', 'date', 'publication', 'blurb', 'links-within-blurb', 'article-link', 'cities', 'states']
     writer = csv.DictWriter(csvfile, fieldnames=fieldNames)
 
     writer.writeheader()
