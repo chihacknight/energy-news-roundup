@@ -2,8 +2,11 @@
 
 Chi Hack Night scraping project for energy news information
 
-## Running the script
+## Setup
+First do `pip install -r requirements.txt`
+Then run `python3 nltk-setup.py`
 
+## Running the script
 To run the script run the following in the project directory:
 ```bash
 python3 scrape.py

@@ -4,6 +4,7 @@ import requests				   #Importing the requests library
 import json
 import requests_cache
 import csv
+import locationtagger
 
 #for the older variant, if find 404 page, then stop
 def isFinalPageOld(link):
@@ -47,8 +48,17 @@ def bulletPointScrape(arr, link, date, category):
     curItem['links-within-blurb'] = links
     curItem['article-link'] = link
 
+    print(getStates(curItem))
+
     digestItems.append(curItem)
 
+
+def getStates(item):
+    text = item['blurb'] + ' ' + str(item['links-within-blurb']) + ' ' + item['publication']
+
+    entities = locationtagger.find_locations(text = text)
+
+    return entities.regions
 
 digestItems = []
 
@@ -154,6 +164,8 @@ def getDigestItems(digestLink):
                 curItem['links-within-blurb'] = links
                 curItem['article-link'] = digestLink
 
+                print(getStates(curItem))
+
                 digestItems.append(curItem)
 
         #TODO should get state
@@ -178,6 +190,10 @@ while True:
     print('new pages getting page', newPostCounter)
     response = requests.get(curentPosts.format(NUM_POSTS_PER_PAGE_NEW, newPostCounter))
     parsedText = json.loads(response.text)
+
+    if newPostCounter >=5:
+        break;
+
     if isFinalPageNew(parsedText):
         break
 
@@ -197,6 +213,10 @@ for metaEl in newArticles:
 #run until stop condition of finding 404 page
 while True:
     print('old pages getting page', oldPostCounter)
+
+    if oldPostCounter >= 5:
+        break
+
     if isFinalPageOld(march2022Posts.format(oldPostCounter)):
         break
     response = requests.get(march2022Posts.format(oldPostCounter))
