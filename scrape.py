@@ -10,6 +10,8 @@ import locationtagger
 topSkipStateWords = ['North', 'West', 'South', 'East']
 
 # for the older variant, if find 404 page, then stop
+
+
 def isFinalPageOld(link):
     soup = BeautifulSoup(requests.get(link).text, 'lxml')
     if soup.find(class_='error-404 not-found') is not None:
@@ -18,11 +20,14 @@ def isFinalPageOld(link):
     return False
 
 # for the newer variant, if find an empty array, then stop
+
+
 def isFinalPageNew(jsonFile):
     if len(jsonFile['items']) < 1:
         return True
 
     return False
+
 
 def bulletPointScrape(arr, link, date, category):
     curItem = {}
@@ -53,7 +58,8 @@ def bulletPointScrape(arr, link, date, category):
 
     regionsAndCities = getStates(curItem)
 
-    curItem['states'] = ', '.join(x for x in regionsAndCities.regions if x not in topSkipStateWords)
+    curItem['states'] = ', '.join(
+        x for x in regionsAndCities.regions if x not in topSkipStateWords)
 
     digestItems.append(curItem)
 
@@ -69,6 +75,8 @@ def getStates(item):
 digestItems = []
 
 # digestLink is the link to an article
+
+
 def getDigestItems(digestLink):
     print('getting digest for this page', digestLink)
 
@@ -173,7 +181,8 @@ def getDigestItems(digestLink):
 
                 regionsAndCities = getStates(curItem)
 
-                curItem['states'] = ', '.join(x for x in regionsAndCities.regions if x not in topSkipStateWords)
+                curItem['states'] = ', '.join(
+                    x for x in regionsAndCities.regions if x not in topSkipStateWords)
 
                 digestItems.append(curItem)
 
@@ -220,7 +229,6 @@ for metaEl in newArticles:
     link = metaEl.find_all('a', rel="bookmark")
     for el in link:
         digestLinks.append(el.get('href'))
-    
 
 
 # run until stop condition of finding 404 page
