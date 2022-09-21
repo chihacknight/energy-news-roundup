@@ -6,9 +6,10 @@ import requests_cache
 import csv
 import locationtagger
 
+
+topSkipStateWords = ['North', 'West', 'South', 'East']
+
 # for the older variant, if find 404 page, then stop
-
-
 def isFinalPageOld(link):
     soup = BeautifulSoup(requests.get(link).text, 'lxml')
     if soup.find(class_='error-404 not-found') is not None:
@@ -17,14 +18,11 @@ def isFinalPageOld(link):
     return False
 
 # for the newer variant, if find an empty array, then stop
-
-
 def isFinalPageNew(jsonFile):
     if len(jsonFile['items']) < 1:
         return True
 
     return False
-
 
 def bulletPointScrape(arr, link, date, category):
     curItem = {}
@@ -55,10 +53,7 @@ def bulletPointScrape(arr, link, date, category):
 
     regionsAndCities = getStates(curItem)
 
-    curItem['states'] = ', '.join(x for x in regionsAndCities.regions if x !=
-                                  'North' and x != 'West' and x != 'Paris' and x != 'East' and x != 'South')
-    curItem['cities'] = ', '.join(x for x in regionsAndCities.cities if x !=
-                                  'North' and x != 'West' and x != 'Paris' and x != 'East' and x != 'South' and x != 'Energy' and x != 'Hill' and x != 'House')
+    curItem['states'] = ', '.join(x for x in regionsAndCities.regions if x not in topSkipStateWords)
 
     digestItems.append(curItem)
 
@@ -74,8 +69,6 @@ def getStates(item):
 digestItems = []
 
 # digestLink is the link to an article
-
-
 def getDigestItems(digestLink):
     print('getting digest for this page', digestLink)
 
@@ -180,10 +173,7 @@ def getDigestItems(digestLink):
 
                 regionsAndCities = getStates(curItem)
 
-                curItem['states'] = ', '.join(x for x in regionsAndCities.regions if x !=
-                                              'North' and x != 'West' and x != 'Paris' and x != 'East' and x != 'South')
-                curItem['cities'] = ', '.join(x for x in regionsAndCities.cities if x !=
-                                              'North' and x != 'West' and x != 'Paris' and x != 'East' and x != 'South' and x != 'Energy' and x != 'Hill' and x != 'House')
+                curItem['states'] = ', '.join(x for x in regionsAndCities.regions if x not in topSkipStateWords)
 
                 digestItems.append(curItem)
 
@@ -192,7 +182,7 @@ def getDigestItems(digestLink):
 
 requests_cache.install_cache('getting-article-cache', backend='sqlite')
 
-NUM_POSTS_PER_PAGE_NEW = 300
+NUM_POSTS_PER_PAGE_NEW = 10
 
 march2022Posts = 'https://energynews.us/category/digest/page/{0}/'
 curentPosts = 'https://energynews.us/wp-json/newspack-blocks/v1/articles?className=is-style-borders&showExcerpt=0&moreButton=1&showCategory=1&postsToShow={0}&categories%5B0%5D=20720&categories%5B1%5D=20721&categories%5B2%5D=20710&categories%5B3%5D=20711&categories%5B4%5D=20348&typeScale=3&sectionHeader=Newsletter%20archive&postType%5B0%5D=newspack_nl_cpt&excerptLength=55&showReadMore=0&readMoreLabel=Keep%20reading&showDate=1&showImage=1&showCaption=0&disableImageLazyLoad=0&imageShape=landscape&minHeight=0&moreButtonText&showAuthor=1&showAvatar=1&postLayout=list&columns=3&mediaPosition=top&&&&&&imageScale=3&mobileStack=0&specificMode=0&textColor&customTextColor&singleMode=0&showSubtitle=0&textAlign=left&includedPostStatuses%5B0%5D=publish&page={1}&amp=1'
@@ -203,6 +193,7 @@ newArticles = []
 
 oldPostCounter = 0
 newPostCounter = 1
+debugMode = False
 
 # run until stop condition of no links
 while True:
@@ -221,11 +212,16 @@ while True:
 
     newPostCounter += 1
 
+    if debugMode:
+        break
+
 # get the links from each tag
 for metaEl in newArticles:
     link = metaEl.find_all('a', rel="bookmark")
     for el in link:
         digestLinks.append(el.get('href'))
+    
+
 
 # run until stop condition of finding 404 page
 while True:
@@ -233,6 +229,10 @@ while True:
 
     if isFinalPageOld(march2022Posts.format(oldPostCounter)):
         break
+
+    if debugMode and oldPostCounter >= 3:
+        break
+
     response = requests.get(march2022Posts.format(oldPostCounter))
     soup = BeautifulSoup(response.text, 'lxml')
     articleArray = soup.find_all('article')
@@ -257,7 +257,7 @@ for link in digestLinks:
 # write to csv
 with open('digestItems.csv', 'w') as csvfile:
     fieldNames = ['category', 'date', 'publication', 'blurb',
-                  'links-within-blurb', 'article-link', 'cities', 'states']
+                  'links-within-blurb', 'article-link', 'states']
     writer = csv.DictWriter(csvfile, fieldnames=fieldNames)
 
     writer.writeheader()
