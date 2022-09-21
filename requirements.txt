@@ -4,3 +4,8 @@ lxml
 pandas
 openpyxl
 requests-cache
+locationtagger
+nltk
+spacy
+newspaper3k
+pycountry
