@@ -1,4 +1,3 @@
-from attr import field
 from bs4 import BeautifulSoup  # Importing the Beautiful Soup Library
 import requests  # Importing the requests library
 import json
@@ -8,7 +7,59 @@ import locationtagger
 
 
 topSkipStateWords = ['North', 'West', 'South', 'East']
-
+stateNames = [
+    "alabama",
+    "alaska",
+    "arizona",
+    "arkansas",
+    "california",
+    "colorado",
+    "connecticut",
+    "delaware",
+    "district_of_columbia",
+    "florida",
+    "georgia",
+    "hawaii",
+    "idaho",
+    "illinois",
+    "indiana",
+    "iowa",
+    "kansas",
+    "kentucky",
+    "louisiana",
+    "maine",
+    "maryland",
+    "massachusetts",
+    "michigan",
+    "minnesota",
+    "mississippi",
+    "missouri",
+    "montana",
+    "nebraska",
+    "nevada",
+    "new_hampshire",
+    "new_jersey",
+    "new_mexico",
+    "new_york",
+    "north_carolina",
+    "north_dakota",
+    "ohio",
+    "oklahoma",
+    "oregon",
+    "pennsylvania",
+    "rhode_island",
+    "south_carolina",
+    "south_dakota",
+    "tennessee",
+    "texas",
+    "utah",
+    "vermont",
+    "virginia",
+    "washington",
+    "west_virginia",
+    "wisconsin",
+    "wyoming",
+  ],
 # for the older variant, if find 404 page, then stop
 
 
@@ -61,6 +112,10 @@ def bulletPointScrape(arr, link, date, category):
     curItem['states'] = ', '.join(
         x for x in regionsAndCities.regions if x not in topSkipStateWords)
 
+    if len(curItem['states'])<=0:
+        print('in naive check')
+        curItem['states'] = check_states(blurbText)
+
     digestItems.append(curItem)
 
 
@@ -76,6 +131,13 @@ digestItems = []
 
 # digestLink is the link to an article
 
+def check_states(text):
+    retArr = []
+    for s in stateNames:
+        if s in text:
+            retArr.append(s)
+
+    return s
 
 def getDigestItems(digestLink):
     print('getting digest for this page', digestLink)
@@ -168,7 +230,12 @@ def getDigestItems(digestLink):
                 # add all text to blurb except category and publication
                 for element in p:
                     if element.name != 'strong' and element.name != 'em' and element.name != 'i' and element.name != 'b':
-                        blurbText += element.text
+                        print(element)
+                        print(type(element))
+                        if type(element) == "bs4.element.NavigableString":
+                            blurbText += element
+                        else:
+                            blurbText += element.text
 
                 curItem['blurb'] = blurbText
 
@@ -184,9 +251,11 @@ def getDigestItems(digestLink):
                 curItem['states'] = ', '.join(
                     x for x in regionsAndCities.regions if x not in topSkipStateWords)
 
-                digestItems.append(curItem)
+                if len(curItem['states'])<=0:
+                    print('in naive check')
+                    curItem['states'] = check_states(blurbText)
 
-        # TODO should get state
+                digestItems.append(curItem)
 
 
 requests_cache.install_cache('getting-article-cache', backend='sqlite')
@@ -202,7 +271,7 @@ newArticles = []
 
 oldPostCounter = 0
 newPostCounter = 1
-debugMode = False
+debugMode = True
 
 # run until stop condition of no links
 while True:
