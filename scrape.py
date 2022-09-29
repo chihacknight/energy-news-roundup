@@ -81,7 +81,7 @@ def isFinalPageNew(jsonFile):
     return False
 
 
-def bulletPointScrape(arr, link, date, category):
+def bulletPointScrape(arr, link, date, category, inTextLink):
     curItem = {}
     blurbText = ''
     links = []
@@ -95,22 +95,20 @@ def bulletPointScrape(arr, link, date, category):
             blurbText += arr[childPos].text
         except:
             blurbText += arr[childPos].string
-            print(arr[childPos].name)
-
-        # if the child is an a tag, get the link
-        if arr[childPos].nane == 'a':
-            links.append(arr[childPos].get('href'))
 
     # remove the first character since that should be the bullet point
     if len(blurbText) > 0 and blurbText[0] == '•':
         blurbText = blurbText[1:]
 
+    for link in inTextLink:
+        links.append(link.get('href'))
+
+    curItem['links-within-blurb'] = ', '.join(links)
     curItem['category'] = category
     curItem['date'] = date
     curItem['publication'] = arr[-1].text.strip()[1:-1]
     curItem['blurb'] = blurbText
-    curItem['article-link'] = link
-    curItem['links-within-blurb'] = ', '.join(links)
+    curItem['article-link'] = links
 
     regionsAndCities = getStates(curItem)
 
@@ -198,20 +196,20 @@ def getDigestItems(digestLink):
                         # if last is bullet point, stop collecting then start collecting for next one
                         elif len(child.text.strip()) > 0 and child.text.strip()[-1] == '•':
                             bulletPointScrape(
-                                currentString, link=digestLink, date=date, category=curCategory)
+                                currentString, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
                             currentString = []
                         # if the first or last character is open/close paranthses, stop collecting
                         elif (len(child.text.strip()) > 0 and child.text.strip()[0] == '(') or (len(child.text.strip()) > 0 and child.text.strip()[-1] == ')'):
                             currentString.append(child)
                             gettingDataActive = False
                             bulletPointScrape(
-                                currentString, link=digestLink, date=date, category=curCategory)
+                                currentString, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
                             currentString = []
                         # if the first is bullet point, stop collecting
                         elif len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
                             gettingDataActive = False
                             bulletPointScrape(
-                                currentString, link=digestLink, date=date, category=curCategory)
+                                currentString, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
                             currentString = []
                         # if neither stop condition met and actively collecting data, add to active
                         elif gettingDataActive:
@@ -241,7 +239,7 @@ def getDigestItems(digestLink):
                         try:
                             blurbText += element.text
                         except:
-                            blurbText += element
+                            blurbText += element.string
 
                 curItem['blurb'] = blurbText
 
@@ -276,7 +274,7 @@ newArticles = []
 
 oldPostCounter = 0
 newPostCounter = 1
-debugMode = False
+debugMode = True
 
 # run until stop condition of no links
 while True:
