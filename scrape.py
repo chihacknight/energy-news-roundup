@@ -274,7 +274,7 @@ newArticles = []
 
 oldPostCounter = 0
 newPostCounter = 1
-debugMode = True
+debugMode = False
 
 # run until stop condition of no links
 while True:
