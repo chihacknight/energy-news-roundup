@@ -59,7 +59,8 @@ stateNames = [
     "west_virginia",
     "wisconsin",
     "wyoming",
-  ],
+]
+
 # for the older variant, if find 404 page, then stop
 
 
@@ -90,10 +91,14 @@ def bulletPointScrape(arr, link, date, category):
 
     # adding all the children text, except the last since the last element should be the publication
     for childPos in range(len(arr)-1):
-        blurbText += arr[childPos].text
+        try:
+            blurbText += arr[childPos].text
+        except:
+            blurbText += arr[childPos].string
+            print(arr[childPos].name)
 
         # if the child is an a tag, get the link
-        if arr[childPos].name == 'a':
+        if arr[childPos].nane == 'a':
             links.append(arr[childPos].get('href'))
 
     # remove the first character since that should be the bullet point
@@ -112,8 +117,7 @@ def bulletPointScrape(arr, link, date, category):
     curItem['states'] = ', '.join(
         x for x in regionsAndCities.regions if x not in topSkipStateWords)
 
-    if len(curItem['states'])<=0:
-        print('in naive check')
+    if len(curItem['states']) <= 0:
         curItem['states'] = check_states(blurbText)
 
     digestItems.append(curItem)
@@ -131,13 +135,15 @@ digestItems = []
 
 # digestLink is the link to an article
 
+
 def check_states(text):
     retArr = []
     for s in stateNames:
-        if s in text:
+        if s in ' '.join(text):
             retArr.append(s)
 
-    return s
+    return retArr
+
 
 def getDigestItems(digestLink):
     print('getting digest for this page', digestLink)
@@ -184,31 +190,33 @@ def getDigestItems(digestLink):
                 gettingDataActive = False
 
                 for child in p:
-
-                    # checks if the first character is a bullet point, if so starts collecting child tags
-                    if not gettingDataActive and len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
-                        gettingDataActive = True
-                        currentString.append(child)
-                    # if last is bullet point, stop collecting then start collecting for next one
-                    elif len(child.text.strip()) > 0 and child.text.strip()[-1] == '•':
-                        bulletPointScrape(
-                            currentString, link=digestLink, date=date, category=curCategory)
-                        currentString = []
-                    # if the first or last character is open/close paranthses, stop collecting
-                    elif (len(child.text.strip()) > 0 and child.text.strip()[0] == '(') or (len(child.text.strip()) > 0 and child.text.strip()[-1] == ')'):
-                        currentString.append(child)
-                        gettingDataActive = False
-                        bulletPointScrape(
-                            currentString, link=digestLink, date=date, category=curCategory)
-                        currentString = []
-                    # if the first is bullet point, stop collecting
-                    elif len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
-                        gettingDataActive = False
-                        bulletPointScrape(
-                            currentString, link=digestLink, date=date, category=curCategory)
-                        currentString = []
-                    # if neither stop condition met and actively collecting data, add to active
-                    elif gettingDataActive:
+                    try:
+                        # checks if the first character is a bullet point, if so starts collecting child tags
+                        if not gettingDataActive and len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
+                            gettingDataActive = True
+                            currentString.append(child)
+                        # if last is bullet point, stop collecting then start collecting for next one
+                        elif len(child.text.strip()) > 0 and child.text.strip()[-1] == '•':
+                            bulletPointScrape(
+                                currentString, link=digestLink, date=date, category=curCategory)
+                            currentString = []
+                        # if the first or last character is open/close paranthses, stop collecting
+                        elif (len(child.text.strip()) > 0 and child.text.strip()[0] == '(') or (len(child.text.strip()) > 0 and child.text.strip()[-1] == ')'):
+                            currentString.append(child)
+                            gettingDataActive = False
+                            bulletPointScrape(
+                                currentString, link=digestLink, date=date, category=curCategory)
+                            currentString = []
+                        # if the first is bullet point, stop collecting
+                        elif len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
+                            gettingDataActive = False
+                            bulletPointScrape(
+                                currentString, link=digestLink, date=date, category=curCategory)
+                            currentString = []
+                        # if neither stop condition met and actively collecting data, add to active
+                        elif gettingDataActive:
+                            currentString.append(child)
+                    except:
                         currentString.append(child)
 
             # if there is only one strong tag, that means no bullet points
@@ -230,12 +238,10 @@ def getDigestItems(digestLink):
                 # add all text to blurb except category and publication
                 for element in p:
                     if element.name != 'strong' and element.name != 'em' and element.name != 'i' and element.name != 'b':
-                        print(element)
-                        print(type(element))
-                        if type(element) == "bs4.element.NavigableString":
-                            blurbText += element
-                        else:
+                        try:
                             blurbText += element.text
+                        except:
+                            blurbText += element
 
                 curItem['blurb'] = blurbText
 
@@ -251,8 +257,7 @@ def getDigestItems(digestLink):
                 curItem['states'] = ', '.join(
                     x for x in regionsAndCities.regions if x not in topSkipStateWords)
 
-                if len(curItem['states'])<=0:
-                    print('in naive check')
+                if len(curItem['states']) <= 0:
                     curItem['states'] = check_states(blurbText)
 
                 digestItems.append(curItem)
@@ -271,7 +276,7 @@ newArticles = []
 
 oldPostCounter = 0
 newPostCounter = 1
-debugMode = True
+debugMode = False
 
 # run until stop condition of no links
 while True:
