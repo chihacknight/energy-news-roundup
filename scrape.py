@@ -16,7 +16,7 @@ stateNames = [
     "colorado",
     "connecticut",
     "delaware",
-    "district_of_columbia",
+    "district of columbia",
     "florida",
     "georgia",
     "hawaii",
@@ -37,26 +37,26 @@ stateNames = [
     "montana",
     "nebraska",
     "nevada",
-    "new_hampshire",
-    "new_jersey",
-    "new_mexico",
-    "new_york",
-    "north_carolina",
-    "north_dakota",
+    "new hampshire",
+    "new jersey",
+    "new mexico",
+    "new york",
+    "north carolina",
+    "north dakota",
     "ohio",
     "oklahoma",
     "oregon",
     "pennsylvania",
-    "rhode_island",
-    "south_carolina",
-    "south_dakota",
+    "rhode island",
+    "south carolina",
+    "south dakota",
     "tennessee",
     "texas",
     "utah",
     "vermont",
     "virginia",
     "washington",
-    "west_virginia",
+    "west virginia",
     "wisconsin",
     "wyoming",
 ]
@@ -137,7 +137,7 @@ digestItems = []
 def check_states(text):
     retArr = []
     for s in stateNames:
-        if s in ' '.join(text):
+        if s in text.lower():
             retArr.append(s)
 
     return retArr
@@ -179,7 +179,7 @@ def getDigestItems(digestLink):
 
             curCategory = strongTags[0].text.strip()[:-1]
 
-            if 'sponsored' in curCategory.lower() or 'ad' in curCategory.lower() or 'message' in curCategory.lower():
+            if 'sponsored' in curCategory.lower() or 'ad' in curCategory.lower() or 'message' in curCategory.lower() or 'ponsored' in curCategory.lower():
                 continue
 
             if '•' in p.text:
