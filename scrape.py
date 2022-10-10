@@ -5,6 +5,7 @@ import requests_cache
 import csv
 import locationtagger
 
+debugMode = False
 
 topSkipStateWords = ['North', 'West', 'South', 'East']
 stateNames = [
@@ -41,12 +42,15 @@ stateNames = [
     "new jersey",
     "new mexico",
     "new york",
+    "navajo nation",
     "north carolina",
     "north dakota",
+    "northern chumash",
     "ohio",
     "oklahoma",
     "oregon",
     "pennsylvania",
+    "puerto rico",
     "rhode island",
     "south carolina",
     "south dakota",
@@ -97,8 +101,7 @@ def bulletPointScrape(arr, link, date, category, inTextLink):
             blurbText += arr[childPos].string
 
     # remove the first character since that should be the bullet point
-    if len(blurbText) > 0 and blurbText[0] == '•':
-        blurbText = blurbText[1:]
+    blurbText = blurbText.strip(" •")
 
     for link in inTextLink:
         links.append(link.get('href'))
@@ -108,12 +111,11 @@ def bulletPointScrape(arr, link, date, category, inTextLink):
     curItem['date'] = date
     curItem['publication'] = arr[-1].text.strip()[1:-1]
     curItem['blurb'] = blurbText
-    curItem['article-link'] = links
 
     regionsAndCities = getStates(curItem)
 
     curItem['states'] = ', '.join(
-        x for x in regionsAndCities.regions if x not in topSkipStateWords)
+        x.lower() for x in regionsAndCities.regions if x not in topSkipStateWords)
 
     if len(curItem['states']) <= 0:
         curItem['states'] = check_states(blurbText)
@@ -138,13 +140,13 @@ def check_states(text):
     retArr = []
     for s in stateNames:
         if s in text.lower():
-            retArr.append(s)
+            retArr.append(s.lower())
 
-    return retArr
+    return ', '.join(retArr)
 
 
 def getDigestItems(digestLink):
-    print('getting digest for this page', digestLink)
+    print('getting digest for', digestLink)
 
     response = requests.get(digestLink)
     soup = BeautifulSoup(response.text, 'lxml')
@@ -247,13 +249,12 @@ def getDigestItems(digestLink):
                 for link in p.find_all('a'):
                     links.append(link.get('href'))
 
-                curItem['article-link'] = digestLink
                 curItem['links-within-blurb'] = ', '.join(links)
 
                 regionsAndCities = getStates(curItem)
 
                 curItem['states'] = ', '.join(
-                    x for x in regionsAndCities.regions if x not in topSkipStateWords)
+                    x.lower() for x in regionsAndCities.regions if x not in topSkipStateWords)
 
                 if len(curItem['states']) <= 0:
                     curItem['states'] = check_states(blurbText)
@@ -274,11 +275,11 @@ newArticles = []
 
 oldPostCounter = 0
 newPostCounter = 1
-debugMode = False
 
 # run until stop condition of no links
+print("getting pages after March 2022")
 while True:
-    print('new pages getting page', newPostCounter)
+    print('getting page', newPostCounter)
     response = requests.get(curentPosts.format(
         NUM_POSTS_PER_PAGE_NEW, newPostCounter))
     parsedText = json.loads(response.text)
@@ -304,6 +305,7 @@ for metaEl in newArticles:
 
 
 # run until stop condition of finding 404 page
+print("getting pages before March 2022")
 while True:
     print('old pages getting page', oldPostCounter)
 
@@ -337,7 +339,7 @@ for link in digestLinks:
 # write to csv
 with open('digestItems.csv', 'w') as csvfile:
     fieldNames = ['category', 'date', 'publication', 'blurb',
-                  'links-within-blurb', 'article-link', 'states']
+                  'links-within-blurb', 'states']
     writer = csv.DictWriter(csvfile, fieldnames=fieldNames)
 
     writer.writeheader()
