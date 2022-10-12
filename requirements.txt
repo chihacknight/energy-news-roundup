@@ -9,3 +9,6 @@ nltk
 spacy
 newspaper3k
 pycountry
+wordcloud
+gensim
+pyldavis
