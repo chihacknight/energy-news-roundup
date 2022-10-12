@@ -3,8 +3,14 @@
 Chi Hack Night scraping project for energy news information
 
 ## Setup
-First do `pip install -r requirements.txt`
-Then run `python3 nltk-setup.py`
+First install the base package requirements 
+```pip install -r requirements.txt```
+
+Then download the required natural language toolkit data 
+```python3 nltk-setup.py```
+
+Finally, download the required core english web for `spacy`
+```python3 -m spacy download en```
 
 ## Running the script
 To run the script run the following in the project directory:

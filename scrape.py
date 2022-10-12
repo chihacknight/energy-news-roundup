@@ -1,4 +1,3 @@
-from attr import field
 from bs4 import BeautifulSoup  # Importing the Beautiful Soup Library
 import requests  # Importing the requests library
 import json
@@ -6,8 +5,65 @@ import requests_cache
 import csv
 import locationtagger
 
+debugMode = False
 
 topSkipStateWords = ['North', 'West', 'South', 'East']
+stateNames = [
+    "alabama",
+    "alaska",
+    "arizona",
+    "arkansas",
+    "california",
+    "colorado",
+    "connecticut",
+    "delaware",
+    "district of columbia",
+    "florida",
+    "georgia",
+    "hawaii",
+    "idaho",
+    "illinois",
+    "indiana",
+    "iowa",
+    "kansas",
+    "kentucky",
+    "louisiana",
+    "maine",
+    "maryland",
+    "massachusetts",
+    "michigan",
+    "minnesota",
+    "mississippi",
+    "missouri",
+    "montana",
+    "nebraska",
+    "nevada",
+    "new hampshire",
+    "new jersey",
+    "new mexico",
+    "new york",
+    "navajo nation",
+    "north carolina",
+    "north dakota",
+    "northern chumash",
+    "ohio",
+    "oklahoma",
+    "oregon",
+    "pennsylvania",
+    "puerto rico",
+    "rhode island",
+    "south carolina",
+    "south dakota",
+    "tennessee",
+    "texas",
+    "utah",
+    "vermont",
+    "virginia",
+    "washington",
+    "west virginia",
+    "wisconsin",
+    "wyoming",
+]
 
 # for the older variant, if find 404 page, then stop
 
@@ -29,7 +85,7 @@ def isFinalPageNew(jsonFile):
     return False
 
 
-def bulletPointScrape(arr, link, date, category):
+def bulletPointScrape(arr, link, date, category, inTextLink):
     curItem = {}
     blurbText = ''
     links = []
@@ -39,27 +95,30 @@ def bulletPointScrape(arr, link, date, category):
 
     # adding all the children text, except the last since the last element should be the publication
     for childPos in range(len(arr)-1):
-        blurbText += arr[childPos].text
-
-        # if the child is an a tag, get the link
-        if arr[childPos].name == 'a':
-            links.append(arr[childPos].get('href'))
+        try:
+            blurbText += arr[childPos].text
+        except:
+            blurbText += arr[childPos].string
 
     # remove the first character since that should be the bullet point
-    if len(blurbText) > 0 and blurbText[0] == '•':
-        blurbText = blurbText[1:]
+    blurbText = blurbText.strip(" •")
 
+    for link in inTextLink:
+        links.append(link.get('href'))
+
+    curItem['links-within-blurb'] = ', '.join(links)
     curItem['category'] = category
     curItem['date'] = date
     curItem['publication'] = arr[-1].text.strip()[1:-1]
     curItem['blurb'] = blurbText
-    curItem['article-link'] = link
-    curItem['links-within-blurb'] = ', '.join(links)
 
     regionsAndCities = getStates(curItem)
 
     curItem['states'] = ', '.join(
-        x for x in regionsAndCities.regions if x not in topSkipStateWords)
+        x.lower() for x in regionsAndCities.regions if x not in topSkipStateWords)
+
+    if len(curItem['states']) <= 0:
+        curItem['states'] = check_states(blurbText)
 
     digestItems.append(curItem)
 
@@ -77,8 +136,17 @@ digestItems = []
 # digestLink is the link to an article
 
 
+def check_states(text):
+    retArr = []
+    for s in stateNames:
+        if s in text.lower():
+            retArr.append(s.lower())
+
+    return ', '.join(retArr)
+
+
 def getDigestItems(digestLink):
-    print('getting digest for this page', digestLink)
+    print('getting digest for', digestLink)
 
     response = requests.get(digestLink)
     soup = BeautifulSoup(response.text, 'lxml')
@@ -113,7 +181,7 @@ def getDigestItems(digestLink):
 
             curCategory = strongTags[0].text.strip()[:-1]
 
-            if 'sponsored' in curCategory.lower() or 'ad' in curCategory.lower() or 'message' in curCategory.lower():
+            if 'sponsored' in curCategory.lower() or 'ad' in curCategory.lower() or 'message' in curCategory.lower() or 'ponsored' in curCategory.lower():
                 continue
 
             if '•' in p.text:
@@ -122,31 +190,33 @@ def getDigestItems(digestLink):
                 gettingDataActive = False
 
                 for child in p:
-
-                    # checks if the first character is a bullet point, if so starts collecting child tags
-                    if not gettingDataActive and len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
-                        gettingDataActive = True
-                        currentString.append(child)
-                    # if last is bullet point, stop collecting then start collecting for next one
-                    elif len(child.text.strip()) > 0 and child.text.strip()[-1] == '•':
-                        bulletPointScrape(
-                            currentString, link=digestLink, date=date, category=curCategory)
-                        currentString = []
-                    # if the first or last character is open/close paranthses, stop collecting
-                    elif (len(child.text.strip()) > 0 and child.text.strip()[0] == '(') or (len(child.text.strip()) > 0 and child.text.strip()[-1] == ')'):
-                        currentString.append(child)
-                        gettingDataActive = False
-                        bulletPointScrape(
-                            currentString, link=digestLink, date=date, category=curCategory)
-                        currentString = []
-                    # if the first is bullet point, stop collecting
-                    elif len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
-                        gettingDataActive = False
-                        bulletPointScrape(
-                            currentString, link=digestLink, date=date, category=curCategory)
-                        currentString = []
-                    # if neither stop condition met and actively collecting data, add to active
-                    elif gettingDataActive:
+                    try:
+                        # checks if the first character is a bullet point, if so starts collecting child tags
+                        if not gettingDataActive and len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
+                            gettingDataActive = True
+                            currentString.append(child)
+                        # if last is bullet point, stop collecting then start collecting for next one
+                        elif len(child.text.strip()) > 0 and child.text.strip()[-1] == '•':
+                            bulletPointScrape(
+                                currentString, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
+                            currentString = []
+                        # if the first or last character is open/close paranthses, stop collecting
+                        elif (len(child.text.strip()) > 0 and child.text.strip()[0] == '(') or (len(child.text.strip()) > 0 and child.text.strip()[-1] == ')'):
+                            currentString.append(child)
+                            gettingDataActive = False
+                            bulletPointScrape(
+                                currentString, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
+                            currentString = []
+                        # if the first is bullet point, stop collecting
+                        elif len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
+                            gettingDataActive = False
+                            bulletPointScrape(
+                                currentString, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
+                            currentString = []
+                        # if neither stop condition met and actively collecting data, add to active
+                        elif gettingDataActive:
+                            currentString.append(child)
+                    except:
                         currentString.append(child)
 
             # if there is only one strong tag, that means no bullet points
@@ -168,7 +238,10 @@ def getDigestItems(digestLink):
                 # add all text to blurb except category and publication
                 for element in p:
                     if element.name != 'strong' and element.name != 'em' and element.name != 'i' and element.name != 'b':
-                        blurbText += element.text
+                        try:
+                            blurbText += element.text
+                        except:
+                            blurbText += element.string
 
                 curItem['blurb'] = blurbText
 
@@ -176,17 +249,17 @@ def getDigestItems(digestLink):
                 for link in p.find_all('a'):
                     links.append(link.get('href'))
 
-                curItem['article-link'] = digestLink
                 curItem['links-within-blurb'] = ', '.join(links)
 
                 regionsAndCities = getStates(curItem)
 
                 curItem['states'] = ', '.join(
-                    x for x in regionsAndCities.regions if x not in topSkipStateWords)
+                    x.lower() for x in regionsAndCities.regions if x not in topSkipStateWords)
+
+                if len(curItem['states']) <= 0:
+                    curItem['states'] = check_states(blurbText)
 
                 digestItems.append(curItem)
-
-        # TODO should get state
 
 
 requests_cache.install_cache('getting-article-cache', backend='sqlite')
@@ -202,11 +275,11 @@ newArticles = []
 
 oldPostCounter = 0
 newPostCounter = 1
-debugMode = False
 
 # run until stop condition of no links
+print("getting pages after March 2022")
 while True:
-    print('new pages getting page', newPostCounter)
+    print('getting page', newPostCounter)
     response = requests.get(curentPosts.format(
         NUM_POSTS_PER_PAGE_NEW, newPostCounter))
     parsedText = json.loads(response.text)
@@ -232,6 +305,7 @@ for metaEl in newArticles:
 
 
 # run until stop condition of finding 404 page
+print("getting pages before March 2022")
 while True:
     print('old pages getting page', oldPostCounter)
 
@@ -265,7 +339,7 @@ for link in digestLinks:
 # write to csv
 with open('digestItems.csv', 'w') as csvfile:
     fieldNames = ['category', 'date', 'publication', 'blurb',
-                  'links-within-blurb', 'article-link', 'states']
+                  'links-within-blurb', 'states']
     writer = csv.DictWriter(csvfile, fieldnames=fieldNames)
 
     writer.writeheader()
