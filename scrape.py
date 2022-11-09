@@ -120,6 +120,10 @@ def bulletPointScrape(arr, link, date, category, inTextLink):
     if len(curItem['states']) <= 0:
         curItem['states'] = check_states(blurbText)
 
+
+    if 'sponsored link' in curItem['publication']:
+        return
+
     digestItems.append(curItem)
 
 
@@ -148,6 +152,9 @@ def check_states(text):
 
 
 def clean_pub(pub):
+    if len(pub) <= 0:
+        return pub
+
     temp = pub.strip()
     if temp[0] == '(' and temp[-1] == ')':
         temp = temp[1:-1]
@@ -195,6 +202,15 @@ def getDigestItems(digestLink):
     response = requests.get(digestLink)
     soup = BeautifulSoup(response.text, 'lxml')
 
+    if soup.i or soup.b:
+        if soup.i:
+            soup.i.replace_with(soup.new_tag('em'))
+        
+        if soup.b:
+            soup.b.replace_with(soup.new_tag('strong'))
+
+        print(soup)
+    
     date = ''
 
     datePosted = soup.find(class_='posted-on')
@@ -240,11 +256,14 @@ def getDigestItems(digestLink):
                 publication = 'Unknown'
 
                 # because of inconsistencies, the oublication can either be in an em or in an i tag, so check both
-                if p.find('em') is not None:
-                    publication = clean_pub(p.find('em').text.strip())
-                elif p.find('i') is not None:
-                    publication = clean_pub(p.find('i').text.strip())
+                if p.find_all('em') is not None:
+                    publication = clean_pub(p.find_all('em')[-1].text.strip())
+                elif p.find_all('i') is not None:
+                    publication = clean_pub(p.find_all('i')[-1].text.strip())
                 curItem['publication'] = publication
+
+                if 'sponsored link' in publication:
+                    continue
 
                 blurbText = ''
                 # add all text to blurb except category and publication
