@@ -112,6 +112,9 @@ def bulletPointScrape(arr, link, date, category, inTextLink):
     curItem['publication'] = clean_pub(arr[-1].text.strip())
     curItem['blurb'] = blurbText
 
+    if '•' in blurbText:
+        raise Exception('Found bullet point in blurb')
+
     regionsAndCities = getStates(curItem)
 
     curItem['states'] = ', '.join(
@@ -119,7 +122,6 @@ def bulletPointScrape(arr, link, date, category, inTextLink):
 
     if len(curItem['states']) <= 0:
         curItem['states'] = check_states(blurbText)
-
 
     if 'sponsored link' in curItem['publication']:
         return
@@ -160,6 +162,7 @@ def clean_pub(pub):
         temp = temp[1:-1]
     return temp
 
+
 def bullet_scrape_logic(p, digestLink, date, curCategory):
     currentElements = []
     gettingDataActive = False
@@ -195,7 +198,6 @@ def bullet_scrape_logic(p, digestLink, date, curCategory):
             currentElements.append(child)
 
 
-
 def getDigestItems(digestLink):
     print('getting digest for', digestLink)
 
@@ -205,12 +207,12 @@ def getDigestItems(digestLink):
     if soup.i or soup.b:
         if soup.i:
             soup.i.replace_with(soup.new_tag('em'))
-        
+
         if soup.b:
             soup.b.replace_with(soup.new_tag('strong'))
 
         print(soup)
-    
+
     date = ''
 
     datePosted = soup.find(class_='posted-on')
@@ -245,7 +247,8 @@ def getDigestItems(digestLink):
                 continue
 
             if '•' in p.text:
-                bullet_scrape_logic(p=p, digestLink=digestLink, date=date, curCategory=curCategory)
+                bullet_scrape_logic(p=p, digestLink=digestLink,
+                                    date=date, curCategory=curCategory)
 
             # if there is only one strong tag, that means no bullet points
             else:
@@ -289,6 +292,9 @@ def getDigestItems(digestLink):
 
                 if len(curItem['states']) <= 0:
                     curItem['states'] = check_states(blurbText)
+
+                if '•' in blurbText:
+                    raise Exception('Found bullet point in blurb')
 
                 digestItems.append(curItem)
 
