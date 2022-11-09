@@ -304,42 +304,12 @@ requests_cache.install_cache('getting-article-cache', backend='sqlite')
 NUM_POSTS_PER_PAGE_NEW = 10
 
 march2022Posts = 'https://energynews.us/category/digest/page/{0}/'
-curentPosts = 'https://energynews.us/wp-json/newspack-blocks/v1/articles?className=is-style-borders&showExcerpt=0&moreButton=1&showCategory=1&postsToShow={0}&categories%5B0%5D=20720&categories%5B1%5D=20721&categories%5B2%5D=20710&categories%5B3%5D=20711&categories%5B4%5D=20348&typeScale=3&sectionHeader=Newsletter%20archive&postType%5B0%5D=newspack_nl_cpt&excerptLength=55&showReadMore=0&readMoreLabel=Keep%20reading&showDate=1&showImage=1&showCaption=0&disableImageLazyLoad=0&imageShape=landscape&minHeight=0&moreButtonText&showAuthor=1&showAvatar=1&postLayout=list&columns=3&mediaPosition=top&&&&&&imageScale=3&mobileStack=0&specificMode=0&textColor&customTextColor&singleMode=0&showSubtitle=0&textAlign=left&includedPostStatuses%5B0%5D=publish&page={1}&amp=1'
 
 digestLinks = []
 oldArticles = []
-newArticles = []
 
 oldPostCounter = 0
 newPostCounter = 1
-
-# run until stop condition of no links
-print("getting pages after March 2022")
-while True:
-    print('getting page', newPostCounter)
-    response = requests.get(curentPosts.format(
-        NUM_POSTS_PER_PAGE_NEW, newPostCounter))
-    parsedText = json.loads(response.text)
-
-    if isFinalPageNew(parsedText):
-        break
-
-    for block in parsedText['items']:
-        soup = BeautifulSoup(block['html'], 'lxml')
-        articleArray = soup.find_all(class_='entry-title')
-        newArticles.extend(articleArray)
-
-    newPostCounter += 1
-
-    if debugMode:
-        break
-
-# get the links from each tag
-for metaEl in newArticles:
-    link = metaEl.find_all('a', rel="bookmark")
-    for el in link:
-        digestLinks.append(el.get('href'))
-
 
 # run until stop condition of finding 404 page
 print("getting pages before March 2022")
