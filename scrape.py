@@ -5,7 +5,7 @@ import requests_cache
 import csv
 import locationtagger
 
-debugMode = False
+debugMode = True
 
 topSkipStateWords = ['North', 'West', 'South', 'East']
 stateNames = [
@@ -109,7 +109,7 @@ def bulletPointScrape(arr, link, date, category, inTextLink):
     curItem['links-within-blurb'] = ', '.join(links)
     curItem['category'] = category
     curItem['date'] = date
-    curItem['publication'] = arr[-1].text.strip()[1:-1]
+    curItem['publication'] = clean_pub(arr[-1].text.strip())
     curItem['blurb'] = blurbText
 
     regionsAndCities = getStates(curItem)
@@ -143,6 +143,50 @@ def check_states(text):
             retArr.append(s.lower())
 
     return ', '.join(retArr)
+
+# clean "publication name" to remove parentheses if there are parentheses
+
+
+def clean_pub(pub):
+    temp = pub.strip()
+    if temp[0] == '(' and temp[-1] == ')':
+        temp = temp[1:-1]
+    return temp
+
+def bullet_scrape_logic(p, digestLink, date, curCategory):
+    currentElements = []
+    gettingDataActive = False
+
+    for child in p:
+        try:
+            # checks if the first character is a bullet point, if so starts collecting child tags
+            if not gettingDataActive and len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
+                gettingDataActive = True
+                currentElements.append(child)
+            # if last is bullet point, stop collecting then start collecting for next one
+            elif len(child.text.strip()) > 0 and child.text.strip()[-1] == '•':
+                bulletPointScrape(
+                    currentElements, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
+                currentElements = []
+            # if the first or last character is open/close paranthses, stop collecting
+            elif (len(child.text.strip()) > 0 and child.text.strip()[0] == '(') or (len(child.text.strip()) > 0 and child.text.strip()[-1] == ')'):
+                currentElements.append(child)
+                gettingDataActive = False
+                bulletPointScrape(
+                    currentElements, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
+                currentElements = []
+            # if the first is bullet point, stop collecting
+            elif len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
+                gettingDataActive = False
+                bulletPointScrape(
+                    currentElements, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
+                currentElements = []
+            # if neither stop condition met and actively collecting data, add to active
+            elif gettingDataActive:
+                currentElements.append(child)
+        except:
+            currentElements.append(child)
+
 
 
 def getDigestItems(digestLink):
@@ -185,39 +229,7 @@ def getDigestItems(digestLink):
                 continue
 
             if '•' in p.text:
-
-                currentString = []
-                gettingDataActive = False
-
-                for child in p:
-                    try:
-                        # checks if the first character is a bullet point, if so starts collecting child tags
-                        if not gettingDataActive and len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
-                            gettingDataActive = True
-                            currentString.append(child)
-                        # if last is bullet point, stop collecting then start collecting for next one
-                        elif len(child.text.strip()) > 0 and child.text.strip()[-1] == '•':
-                            bulletPointScrape(
-                                currentString, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
-                            currentString = []
-                        # if the first or last character is open/close paranthses, stop collecting
-                        elif (len(child.text.strip()) > 0 and child.text.strip()[0] == '(') or (len(child.text.strip()) > 0 and child.text.strip()[-1] == ')'):
-                            currentString.append(child)
-                            gettingDataActive = False
-                            bulletPointScrape(
-                                currentString, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
-                            currentString = []
-                        # if the first is bullet point, stop collecting
-                        elif len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
-                            gettingDataActive = False
-                            bulletPointScrape(
-                                currentString, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
-                            currentString = []
-                        # if neither stop condition met and actively collecting data, add to active
-                        elif gettingDataActive:
-                            currentString.append(child)
-                    except:
-                        currentString.append(child)
+                bullet_scrape_logic(p=p, digestLink=digestLink, date=date, curCategory=curCategory)
 
             # if there is only one strong tag, that means no bullet points
             else:
@@ -229,9 +241,9 @@ def getDigestItems(digestLink):
 
                 # because of inconsistencies, the oublication can either be in an em or in an i tag, so check both
                 if p.find('em') is not None:
-                    publication = p.find('em').text.strip()[1:-1]
+                    publication = clean_pub(p.find('em').text.strip())
                 elif p.find('i') is not None:
-                    publication = p.find('i').text.strip()[1:-1]
+                    publication = clean_pub(p.find('i').text.strip())
                 curItem['publication'] = publication
 
                 blurbText = ''
@@ -336,13 +348,24 @@ for aElement in oldArticles:
 for link in digestLinks:
     getDigestItems(link)
 
-# write to csv
-with open('digestItems.csv', 'w') as csvfile:
-    fieldNames = ['category', 'date', 'publication', 'blurb',
-                  'links-within-blurb', 'states']
-    writer = csv.DictWriter(csvfile, fieldnames=fieldNames)
+if debugMode:
+    with open('testDigest.csv', 'w') as csvfile:
+        fieldNames = ['category', 'date', 'publication', 'blurb',
+                      'links-within-blurb', 'states']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldNames)
 
-    writer.writeheader()
+        writer.writeheader()
 
-    for row in digestItems:
-        writer.writerow(row)
+        for row in digestItems:
+            writer.writerow(row)
+else:
+    # write to csv
+    with open('digestItems.csv', 'w') as csvfile:
+        fieldNames = ['category', 'date', 'publication', 'blurb',
+                      'links-within-blurb', 'states']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldNames)
+
+        writer.writeheader()
+
+        for row in digestItems:
+            writer.writerow(row)
