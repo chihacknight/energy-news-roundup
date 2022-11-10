@@ -84,6 +84,27 @@ def isFinalPageNew(jsonFile):
 
     return False
 
+def findAndReturnStates(blurb, pub):
+    regionsAndCities = getStates(blurb, pub)
+
+    curState = ', '.join(
+        x.lower() for x in regionsAndCities.regions if x not in topSkipStateWords)
+
+    if len(curState) <= 0:
+        curState = check_states(blurb)
+    
+    return curState
+
+def addToDigestItems(links, cat, date, pub, blurb, states):
+    curItem = {}
+    curItem['links-within-blurb'] = ', '.join(links)
+    curItem['category'] = cat
+    curItem['date'] = date
+    curItem['publication'] = pub
+    curItem['blurb'] = blurb
+    curItem['states'] = states
+
+    digestItems.append(curItem)
 
 def bulletPointScrape(arr, link, date, category, inTextLink):
     curItem = {}
@@ -106,31 +127,18 @@ def bulletPointScrape(arr, link, date, category, inTextLink):
     for link in inTextLink:
         links.append(link.get('href'))
 
-    curItem['links-within-blurb'] = ', '.join(links)
-    curItem['category'] = category
-    curItem['date'] = date
-    curItem['publication'] = clean_pub(arr[-1].text.strip())
-    curItem['blurb'] = blurbText
-
     if '•' in blurbText:
         raise Exception('Found bullet point in blurb')
+    
+    pub = arr[-1].text.strip()
 
-    regionsAndCities = getStates(curItem)
+    curState = findAndReturnStates(blurb=blurbText, pub=pub)
 
-    curItem['states'] = ', '.join(
-        x.lower() for x in regionsAndCities.regions if x not in topSkipStateWords)
-
-    if len(curItem['states']) <= 0:
-        curItem['states'] = check_states(blurbText)
-
-    if 'sponsored link' in curItem['publication']:
-        return
-
-    digestItems.append(curItem)
+    addToDigestItems(link=links, cat=category, date=date, pub=pub, blurb=blurbText, states=curState)
 
 
-def getStates(item):
-    text = item['blurb'] + ' ' + item['publication']
+def getStates(blurb, pub):
+    text = blurb + ' ' + pub
 
     entities = locationtagger.find_locations(text=text)
 
@@ -285,18 +293,12 @@ def getDigestItems(digestLink):
 
                 curItem['links-within-blurb'] = ', '.join(links)
 
-                regionsAndCities = getStates(curItem)
-
-                curItem['states'] = ', '.join(
-                    x.lower() for x in regionsAndCities.regions if x not in topSkipStateWords)
-
-                if len(curItem['states']) <= 0:
-                    curItem['states'] = check_states(blurbText)
+                curState = findAndReturnStates(blurbText, publication)
 
                 if '•' in blurbText:
                     raise Exception('Found bullet point in blurb')
 
-                digestItems.append(curItem)
+                addToDigestItems(links=link, pub=publication, cat=curCategory, date=date, blurb=blurbText, states=curState)
 
 
 requests_cache.install_cache('getting-article-cache', backend='sqlite')
