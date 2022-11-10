@@ -5,7 +5,7 @@ import requests_cache
 import csv
 import locationtagger
 
-debugMode = False
+debugMode = True
 
 topSkipStateWords = ['North', 'West', 'South', 'East']
 stateNames = [
@@ -84,6 +84,27 @@ def isFinalPageNew(jsonFile):
 
     return False
 
+def findAndReturnStates(blurb, pub):
+    regionsAndCities = getStates(blurb, pub)
+
+    curState = ', '.join(
+        x.lower() for x in regionsAndCities.regions if x not in topSkipStateWords)
+
+    if len(curState) <= 0:
+        curState = check_states(blurb)
+    
+    return curState
+
+def addToDigestItems(links, cat, date, pub, blurb, states):
+    curItem = {}
+    curItem['links-within-blurb'] = ', '.join(links)
+    curItem['category'] = cat
+    curItem['date'] = date
+    curItem['publication'] = pub
+    curItem['blurb'] = blurb
+    curItem['states'] = states
+
+    digestItems.append(curItem)
 
 def bulletPointScrape(arr, link, date, category, inTextLink):
     curItem = {}
@@ -106,25 +127,18 @@ def bulletPointScrape(arr, link, date, category, inTextLink):
     for link in inTextLink:
         links.append(link.get('href'))
 
-    curItem['links-within-blurb'] = ', '.join(links)
-    curItem['category'] = category
-    curItem['date'] = date
-    curItem['publication'] = arr[-1].text.strip()[1:-1]
-    curItem['blurb'] = blurbText
+    if '•' in blurbText:
+        raise Exception('Found bullet point in blurb')
+    
+    pub = arr[-1].text.strip()
 
-    regionsAndCities = getStates(curItem)
+    curState = findAndReturnStates(blurb=blurbText, pub=pub)
 
-    curItem['states'] = ', '.join(
-        x.lower() for x in regionsAndCities.regions if x not in topSkipStateWords)
-
-    if len(curItem['states']) <= 0:
-        curItem['states'] = check_states(blurbText)
-
-    digestItems.append(curItem)
+    addToDigestItems(link=links, cat=category, date=date, pub=pub, blurb=blurbText, states=curState)
 
 
-def getStates(item):
-    text = item['blurb'] + ' ' + item['publication']
+def getStates(blurb, pub):
+    text = blurb + ' ' + pub
 
     entities = locationtagger.find_locations(text=text)
 
@@ -144,12 +158,68 @@ def check_states(text):
 
     return ', '.join(retArr)
 
+# clean "publication name" to remove parentheses if there are parentheses
+
+
+def clean_pub(pub):
+    if len(pub) <= 0:
+        return pub
+
+    temp = pub.strip()
+    if temp[0] == '(' and temp[-1] == ')':
+        temp = temp[1:-1]
+    return temp
+
+
+def bullet_scrape_logic(p, digestLink, date, curCategory):
+    currentElements = []
+    gettingDataActive = False
+
+    for child in p:
+        try:
+            # checks if the first character is a bullet point, if so starts collecting child tags
+            if not gettingDataActive and len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
+                gettingDataActive = True
+                currentElements.append(child)
+            # if last is bullet point, stop collecting then start collecting for next one
+            elif len(child.text.strip()) > 0 and child.text.strip()[-1] == '•':
+                bulletPointScrape(
+                    currentElements, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
+                currentElements = []
+            # if the first or last character is open/close paranthses, stop collecting
+            elif (len(child.text.strip()) > 0 and child.text.strip()[0] == '(') or (len(child.text.strip()) > 0 and child.text.strip()[-1] == ')'):
+                currentElements.append(child)
+                gettingDataActive = False
+                bulletPointScrape(
+                    currentElements, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
+                currentElements = []
+            # if the first is bullet point, stop collecting
+            elif len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
+                gettingDataActive = False
+                bulletPointScrape(
+                    currentElements, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
+                currentElements = []
+            # if neither stop condition met and actively collecting data, add to active
+            elif gettingDataActive:
+                currentElements.append(child)
+        except:
+            currentElements.append(child)
+
 
 def getDigestItems(digestLink):
     print('getting digest for', digestLink)
 
     response = requests.get(digestLink)
     soup = BeautifulSoup(response.text, 'lxml')
+
+    if soup.i or soup.b:
+        if soup.i:
+            soup.i.replace_with(soup.new_tag('em'))
+
+        if soup.b:
+            soup.b.replace_with(soup.new_tag('strong'))
+
+        print(soup)
 
     date = ''
 
@@ -185,39 +255,8 @@ def getDigestItems(digestLink):
                 continue
 
             if '•' in p.text:
-
-                currentString = []
-                gettingDataActive = False
-
-                for child in p:
-                    try:
-                        # checks if the first character is a bullet point, if so starts collecting child tags
-                        if not gettingDataActive and len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
-                            gettingDataActive = True
-                            currentString.append(child)
-                        # if last is bullet point, stop collecting then start collecting for next one
-                        elif len(child.text.strip()) > 0 and child.text.strip()[-1] == '•':
-                            bulletPointScrape(
-                                currentString, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
-                            currentString = []
-                        # if the first or last character is open/close paranthses, stop collecting
-                        elif (len(child.text.strip()) > 0 and child.text.strip()[0] == '(') or (len(child.text.strip()) > 0 and child.text.strip()[-1] == ')'):
-                            currentString.append(child)
-                            gettingDataActive = False
-                            bulletPointScrape(
-                                currentString, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
-                            currentString = []
-                        # if the first is bullet point, stop collecting
-                        elif len(child.text.strip()) > 0 and child.text.strip()[0] == '•':
-                            gettingDataActive = False
-                            bulletPointScrape(
-                                currentString, link=digestLink, date=date, category=curCategory, inTextLink=p.find_all('a'))
-                            currentString = []
-                        # if neither stop condition met and actively collecting data, add to active
-                        elif gettingDataActive:
-                            currentString.append(child)
-                    except:
-                        currentString.append(child)
+                bullet_scrape_logic(p=p, digestLink=digestLink,
+                                    date=date, curCategory=curCategory)
 
             # if there is only one strong tag, that means no bullet points
             else:
@@ -228,11 +267,14 @@ def getDigestItems(digestLink):
                 publication = 'Unknown'
 
                 # because of inconsistencies, the oublication can either be in an em or in an i tag, so check both
-                if p.find('em') is not None:
-                    publication = p.find('em').text.strip()[1:-1]
-                elif p.find('i') is not None:
-                    publication = p.find('i').text.strip()[1:-1]
+                if p.find_all('em') is not None:
+                    publication = clean_pub(p.find_all('em')[-1].text.strip())
+                elif p.find_all('i') is not None:
+                    publication = clean_pub(p.find_all('i')[-1].text.strip())
                 curItem['publication'] = publication
+
+                if 'sponsored link' in publication:
+                    continue
 
                 blurbText = ''
                 # add all text to blurb except category and publication
@@ -251,15 +293,12 @@ def getDigestItems(digestLink):
 
                 curItem['links-within-blurb'] = ', '.join(links)
 
-                regionsAndCities = getStates(curItem)
+                curState = findAndReturnStates(blurbText, publication)
 
-                curItem['states'] = ', '.join(
-                    x.lower() for x in regionsAndCities.regions if x not in topSkipStateWords)
+                if '•' in blurbText:
+                    raise Exception('Found bullet point in blurb')
 
-                if len(curItem['states']) <= 0:
-                    curItem['states'] = check_states(blurbText)
-
-                digestItems.append(curItem)
+                addToDigestItems(links=link, pub=publication, cat=curCategory, date=date, blurb=blurbText, states=curState)
 
 
 requests_cache.install_cache('getting-article-cache', backend='sqlite')
@@ -267,42 +306,12 @@ requests_cache.install_cache('getting-article-cache', backend='sqlite')
 NUM_POSTS_PER_PAGE_NEW = 10
 
 march2022Posts = 'https://energynews.us/category/digest/page/{0}/'
-curentPosts = 'https://energynews.us/wp-json/newspack-blocks/v1/articles?className=is-style-borders&showExcerpt=0&moreButton=1&showCategory=1&postsToShow={0}&categories%5B0%5D=20720&categories%5B1%5D=20721&categories%5B2%5D=20710&categories%5B3%5D=20711&categories%5B4%5D=20348&typeScale=3&sectionHeader=Newsletter%20archive&postType%5B0%5D=newspack_nl_cpt&excerptLength=55&showReadMore=0&readMoreLabel=Keep%20reading&showDate=1&showImage=1&showCaption=0&disableImageLazyLoad=0&imageShape=landscape&minHeight=0&moreButtonText&showAuthor=1&showAvatar=1&postLayout=list&columns=3&mediaPosition=top&&&&&&imageScale=3&mobileStack=0&specificMode=0&textColor&customTextColor&singleMode=0&showSubtitle=0&textAlign=left&includedPostStatuses%5B0%5D=publish&page={1}&amp=1'
 
 digestLinks = []
 oldArticles = []
-newArticles = []
 
 oldPostCounter = 0
 newPostCounter = 1
-
-# run until stop condition of no links
-print("getting pages after March 2022")
-while True:
-    print('getting page', newPostCounter)
-    response = requests.get(curentPosts.format(
-        NUM_POSTS_PER_PAGE_NEW, newPostCounter))
-    parsedText = json.loads(response.text)
-
-    if isFinalPageNew(parsedText):
-        break
-
-    for block in parsedText['items']:
-        soup = BeautifulSoup(block['html'], 'lxml')
-        articleArray = soup.find_all(class_='entry-title')
-        newArticles.extend(articleArray)
-
-    newPostCounter += 1
-
-    if debugMode:
-        break
-
-# get the links from each tag
-for metaEl in newArticles:
-    link = metaEl.find_all('a', rel="bookmark")
-    for el in link:
-        digestLinks.append(el.get('href'))
-
 
 # run until stop condition of finding 404 page
 print("getting pages before March 2022")
@@ -336,13 +345,24 @@ for aElement in oldArticles:
 for link in digestLinks:
     getDigestItems(link)
 
-# write to csv
-with open('digestItems.csv', 'w') as csvfile:
-    fieldNames = ['category', 'date', 'publication', 'blurb',
-                  'links-within-blurb', 'states']
-    writer = csv.DictWriter(csvfile, fieldnames=fieldNames)
+if debugMode:
+    with open('testDigest.csv', 'w') as csvfile:
+        fieldNames = ['category', 'date', 'publication', 'blurb',
+                      'links-within-blurb', 'states']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldNames)
 
-    writer.writeheader()
+        writer.writeheader()
 
-    for row in digestItems:
-        writer.writerow(row)
+        for row in digestItems:
+            writer.writerow(row)
+else:
+    # write to csv
+    with open('digestItems.csv', 'w') as csvfile:
+        fieldNames = ['category', 'date', 'publication', 'blurb',
+                      'links-within-blurb', 'states']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldNames)
+
+        writer.writeheader()
+
+        for row in digestItems:
+            writer.writerow(row)
